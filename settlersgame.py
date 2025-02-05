@@ -122,22 +122,16 @@ def hex_cords(tiles):
         tile.ycenter = y_center
     return True
 
+def is_within_threshold(coord1, coord2, threshold):
+    """Check if two coordinates are within the given threshold."""
+    return abs(coord1[0] - coord2[0]) < threshold and abs(coord1[1] - coord2[1]) < threshold
+
 def create_vertex_for_hex(tiles):
     """
-    Create vertices for hex tiles, ensuring shared vertices are reused based on proximity.
-    
-    Parameters:
-        tiles: List of tile objects with `xcenter`, `ycenter`, `number`, and `resource`.
-        hex_size: The size of the hexagon (distance from center to vertex).
-        threshold: Distance threshold for reusing vertices.
-        
     Returns:
         hex_to_verts: Dictionary mapping tile numbers to their vertex IDs.
         vertices: Dictionary mapping vertex IDs to Vertex objects.
     """
-    def is_within_threshold(coord1, coord2, threshold):
-        """Check if two coordinates are within the given threshold."""
-        return abs(coord1[0] - coord2[0]) < threshold and abs(coord1[1] - coord2[1]) < threshold
 
     vert_id = 0
     vertices = {}  # {vertex_id: Vertex}
@@ -163,6 +157,7 @@ def create_vertex_for_hex(tiles):
 
             # Check if this vertex is close enough to an existing one
             close_vertex_id = None
+
             for existing_coords, existing_id in vertex_positions.items():
                 if is_within_threshold(vertex_coords, existing_coords, THRESHOLD):
                     close_vertex_id = existing_id
@@ -178,10 +173,9 @@ def create_vertex_for_hex(tiles):
             else:
                 # Reuse the existing vertex ID
                 hex_to_verts[tile.number][tile.resource].append(close_vertex_id)
-
     return hex_to_verts, vertices, vertex_positions
-#makes the board
 
+#makes the board
 def make_board(screen, board):
     """
     Draw the Settlers of Catan board on the screen with masked images inside hexagons.
@@ -230,7 +224,8 @@ def make_board(screen, board):
         for vertex_id, vertex in board.vertices.items():
             x, y = vertex.cords
             # Draw the vertex as a small circle
-            pygame.draw.circle(screen, WHITE, (int(x), int(y)), 5)
+            pygame.draw.circle(screen, WHITE, (int(x), int(y)), 5)  
+
             if vertex.owner=="player1": 
                 color = RED
             elif vertex.owner =="player2":
@@ -296,6 +291,7 @@ def make_unbuildable(cords, vertex_positions, board, radius=80):
         if distance <= radius:
             board.vertices[vertex].buildable = False
 
+#function that creates the first 2 settlements and roads
 def initialsetup(event, players, board, turns, vertex_positions,screen):
     """
     Handles the initial setup phase for placing settlements.
@@ -308,20 +304,37 @@ def initialsetup(event, players, board, turns, vertex_positions,screen):
             if distance <= CLICK_RADIUS:
                 if board.vertices[vertex].buildable==True:
                     current_player = players[turns.pop(0)]
-                    current_player.build_settlement(board, vertex)  # Build settlement
-                    #trying to calcualte a circle that encaptures the three points around it, to make them unbuildable
+                    current_player.build_settlement(board, vertex)  #ent
                     make_unbuildable(cords,vertex_positions,board)
-                    #player builds road here
                     make_board(screen,board)
-                    add_road(board,current_player,vertex_positions)
-                # Get the current player
-                
+                    first_road(board,current_player,vertex_positions,vertex)
+                    make_board(screen,board)
                 if turns!= []:
                     return False
                 else:
                     return True
     return False
 
+#helper fucntion for the first roads
+def first_road(board, current_player, vertex_positions, target_vertex):
+    running = True
+    verts = board.adj_matrix[target_vertex]
+    while running:
+        for event in pygame.event.get():
+                if event.type == pygame.MOUSEBUTTONDOWN:
+                    cords = event.pos
+                    for position, vertex in vertex_positions.items():
+            # Calculate the distance between the click and the vertex
+                        distance = math.sqrt((cords[0] - position[0])**2 + (cords[1] - position[1])**2)
+                        if distance <= CLICK_RADIUS and vertex in board.adj_matrix[target_vertex]:
+                            edge = Edge(board.vertices[target_vertex],board.vertices[vertex],current_player.name)
+                            build_road(board,edge)
+                            running = False 
+
+def is_adjacent(board, v1, v2):
+    return v2 in board.adj_matrix.get(v1, [])
+
+#distrributes all the resources for each roll
 def distribute_rrs(roll,board,hex_to_verts,players):
     if roll == 7:
         return True
@@ -343,65 +356,103 @@ def distribute_rrs(roll,board,hex_to_verts,players):
                     elif player.name == name:
                         player.resources[tile]=2
     return True
-        
-def add_road(board, player, vertex_positions):
+
+def maketurn(board, players, screen,vertex_positions):
     """
-    Adds a road for a player, ensuring the road is connected to an existing road or settlement.
+    Handles a player's turn in Pygame.
     """
-    road_verts = []
-    
-    while len(road_verts) < 2:
+    turn = board.turn
+    if turn==1:
+        color = RED
+    elif turn ==2:
+        color= GREEN
+    elif turn ==3:
+        color = BLACK
+    elif turn==4:
+        color= YELLOW
+
+    turn = board.turn - 1 # Adjust for 0-based index
+    current_player = players[turn]
+ 
+         
+    # Display the player's turn
+    font = pygame.font.Font(None, 40)
+    turn_text = font.render(f"Player {board.turn}'s Turn", True,color)
+    screen.blit(turn_text, (500, 680))
+
+    # Show the player's resources
+    y_offset = 80
+    font = pygame.font.Font(None, 30)
+    for resource, count in current_player.resources.items():
+        resource_text = font.render(f"{resource}: {count}", True, (255, 255, 255))
+        screen.blit(resource_text, (50, y_offset))
+        y_offset += 30
+
+    # Show the player's development cards
+    y_offset += 20
+    screen.blit(font.render("Development Cards:", True, (255, 255, 255)), (50, y_offset))
+    y_offset += 30
+    for dev_card in current_player.dev_cards:
+        dev_text = font.render(f"- {dev_card}", True, (255, 255, 255))
+        screen.blit(dev_text, (50, y_offset))
+        y_offset += 30
+
+    # Show rewards (Longest Road, Largest Army)
+    y_offset += 20
+    if board.longest_road == current_player.name:
+        screen.blit(font.render("🏆 Longest Road!", True, (255, 255, 0)), (50, y_offset))
+        y_offset += 30
+    if board.largest_army == current_player.name:
+        screen.blit(font.render("🏆 Largest Army!", True, (255, 255, 0)), (50, y_offset))
+
+    # Create action buttons
+    buttons = [
+        Button(50, 300, 200, 50, "Build Road", (0, 128, 255), lambda: add_road(board, current_player,vertex_positions)),
+        Button(50, 360, 200, 50, "Build Settlement", (0, 128, 0), lambda: build_settlement(board, current_player)),
+        Button(50, 420, 200, 50, "Build City", (255, 165, 0), lambda: build_city(board, current_player)),
+        Button(50, 480, 200, 50, "Buy Dev Card", (128, 0, 128), lambda: buy_dev_card(board, current_player)),
+        Button(50, 540, 200, 50, "End Turn", (255, 0, 0), lambda: end_turn(board))
+    ]
+
+    # Draw buttons
+    for button in buttons:
+        button.draw(screen)
+
+    pygame.display.flip()
+
+    # Wait for button clicks
+    while True:
         for event in pygame.event.get():
-            if event.type == pygame.MOUSEBUTTONDOWN:
-                cords = event.pos
-                for position, vertex in vertex_positions.items():
-                    # Calculate distance between click and vertex
-                    distance = math.sqrt((cords[0] - position[0])**2 + (cords[1] - position[1])**2)
-                    if distance <= CLICK_RADIUS:
-                        # First vertex must be owned by the player (settlement/city)
-                        if len(road_verts) == 0 and board.vertices[vertex].owner == player.name:
-                            road_verts.append(vertex)
-                        # Second vertex must be adjacent and connected
-                        elif len(road_verts) == 1 and vertex!=road_verts[0] and are_adjacent(board.vertices[road_verts[0]], board.vertices[vertex]):
-                            if is_road_connected(board, player, board.vertices[road_verts[0]], board.vertices[vertex]):
-                                road_verts.append(vertex)
-                        else:
-                            road_verts = []
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                return
+            elif event.type == pygame.MOUSEBUTTONDOWN:
+                pos = pygame.mouse.get_pos()
+                for button in buttons:
+                    if button.is_clicked(pos):
+                        button.action()  # Execute the button action
+                        return  # Exit turn UI loop
 
-    # Ensure a valid road placement
-    if len(road_verts) == 2:
-        edge = Edge(board.vertices[road_verts[0]], board.vertices[road_verts[1]], player.name)
-        board.edges.append(edge)
-        return True
-    
-    return False  # Invalid road placement
+def build_settlement(board,player):
+    return True
 
-def are_adjacent(vertex1, vertex2):
-    """
-    Checks if two vertices are adjacent based on hexagonal board structure.
-    """
-    x1, y1 = vertex1.cords
-    x2, y2 = vertex2.cords
-    distance = math.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2)
-    
-    return distance < HEX_SIZE * 1.2  # Allow small margin for floating-point errors
+def build_city(board,player):
+    return True
 
-def is_road_connected(board, player, vertex1, vertex2):
-    """
-    Ensures that the road is connected to an existing settlement, city, or road owned by the player.
-    """
-    # If either vertex has a settlement/city owned by the player, allow road placement
-    if (vertex1.owner == player.name and vertex1.type in ["settlement", "city"]) or \
-       (vertex2.owner == player.name and vertex2.type in ["settlement", "city"]):
-        return True
+def buy_dev_card(board,player):
+    return True
 
-    # If any existing road connects to one of these vertices, allow road placement
-    for edge in board.edges:
-        if edge.owner == player.name:
-            if edge.vertex1 in [vertex1, vertex2] or edge.vertex2 in [vertex1, vertex2]:
-                return True  # Road is connected
+def build_road(board,edge):
+    board.edges.append(edge)
 
-    return False  # Road is not connected
+def end_turn(board):
+    if board.turn==4:
+        board.turn=1
+    else:
+        board.turn +=1 
+    return True
+
+
 
 
 
@@ -448,9 +499,7 @@ def main():
                         turn_text = font.render(f"{roll} rolled", True, BLACK)
                         screen.blit(turn_text, (50, 20))
                         distribute_rrs(roll,board,hex_to_verts,players)
-                        maketurn(board,players,screen,vertex_positions)
-                        
-        screen.fill((0, 0, 0))  # Clear the screen
+                        maketurn(board,players,screen,vertex_positions)            
         make_board(screen, board)  # Redraw the board
         pygame.display.flip()  # Update the display
 
@@ -459,5 +508,11 @@ if __name__ == "__main__":
     main()
 
 
-#THINGS THAT NEED TO BE DONE:   BUILDING ROADS, SETTLEMTNS, CITIES, IMPLEMENT DEV CARDS, ENSURE FIRST ROAD MUST BE BUILD ATTACHED TO SETTLEMENT 
+#THINGS THAT NEED TO BE DONE:   
+# BUILDING ROADS, 
+# SETTLEMTNS, 
+# CITIES, 
+# IMPLEMENT DEV CARDS, 
+# ENSURE FIRST ROAD MUST BE BUILD ATTACHED TO SETTLEMENT, 
+# roads build on top of eachoehtre 
 
