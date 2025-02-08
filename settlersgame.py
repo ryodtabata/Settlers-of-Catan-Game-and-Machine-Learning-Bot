@@ -2,7 +2,7 @@ import pygame
 import math
 import random
 from classtypes import *
-from pygamesetup import *
+
 
 
 # Screen Dimensions
@@ -13,6 +13,7 @@ pygame.display.set_caption("Settlers of Catan Board")
 # Hexagon Size
 HEX_SIZE = 60
 CLICK_RADIUS = 10
+turn_ended = False
 # Colors
 # update colour later, with pictures
 WHITE = (255, 255, 255)
@@ -237,9 +238,9 @@ def make_board(screen, board):
         
             # If a settlement exists, draw it
             if vertex.type == "settlement":
-                pygame.draw.circle(screen, color, (int(x), int(y)), 8)
-            elif vertex.type == "city":
                 pygame.draw.circle(screen, color, (int(x), int(y)), 10)
+            elif vertex.type == "city":
+                pygame.draw.circle(screen, color, (int(x), int(y)), 12)
 
         for edge in board.edges:
             x1, y1 = edge.vertex1.cords
@@ -315,6 +316,7 @@ def initialsetup(event, players, board, turns, vertex_positions,screen):
                     return True
     return False
 
+
 #helper fucntion for the first roads
 def first_road(board, current_player, vertex_positions, target_vertex):
     running = True
@@ -358,9 +360,83 @@ def distribute_rrs(roll,board,hex_to_verts,players):
     return True
 
 def maketurn(board, players, screen,vertex_positions):
+    global turn_ended
+    buttons = HUD(board, players, screen,vertex_positions)
+    while True:
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                return
+            elif event.type == pygame.MOUSEBUTTONDOWN:
+                pos = pygame.mouse.get_pos()
+                for button in buttons:
+                    if button.is_clicked(pos):
+                        button.action()  # Execute the button action
+                        HUD(board, players, screen,vertex_positions)
+        
+                        
+        if turn_ended:
+            # Logic to proceed to the next turn goes here
+            print("next turn.")
+            turn_ended = False  # Reset the flag for the next turn
+            return True
+                        
+
+def build_settlement(board,player,vertex_positions):
+    rrs = ['wheat','sheep','brick','wood']
+    for r in rrs:
+        if r not in player.resources:
+            print("does not have")
+            return 
+        elif player.resources[r]<1:
+            print("cannot afford")
+            return
+
+    for r in rrs:
+        player.resources[r] = player.resources[r]-1
+
+    while True:
+        for event in pygame.event.get():
+            print(event)
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                cords = event.pos
+                for position, vertex in vertex_positions.items():
+                # Calculate the distance between the click and the vertex
+                    distance = math.sqrt((cords[0] - position[0])**2 + (cords[1] - position[1])**2)
+                    if distance <= CLICK_RADIUS:
+                        if board.vertices[vertex].buildable==True:
+                            player.build_settlement(board, vertex)  #ent
+                            make_unbuildable(cords,vertex_positions,board)
+                            make_board(screen, board)  # Redraw the board
+                            pygame.display.flip()  # Update the display
+                            return
+                            
+def build_city(board,player):
+    return True
+
+def buy_dev_card(board,player):
+    return True
+
+def build_road(board,edge):
+    board.edges.append(edge)
+
+def end_turn(board):
+    global turn_ended
+    # Only change the turn if the button is clicked
+    turn_ended = True
+    if board.turn ==4:
+        board.turn = 1
+    else:
+        board.turn +=1
+    # Additional logic for ending the turn can go here
+    print("Turn has ended.")
+
+
+def HUD(board, players, screen,vertex_positions):
     """
     Handles a player's turn in Pygame.
     """
+    global turn_ended
     turn = board.turn
     if turn==1:
         color = RED
@@ -407,8 +483,8 @@ def maketurn(board, players, screen,vertex_positions):
 
     # Create action buttons
     buttons = [
-        Button(50, 300, 200, 50, "Build Road", (0, 128, 255), lambda: add_road(board, current_player,vertex_positions)),
-        Button(50, 360, 200, 50, "Build Settlement", (0, 128, 0), lambda: build_settlement(board, current_player)),
+        Button(50, 300, 200, 50, "Build Road", (0, 128, 255), lambda: build_road(board, players, vertex_positions,current_player)),
+        Button(50, 360, 200, 50, "Build Settlement", (0, 128, 0), lambda: build_settlement(board, current_player,vertex_positions)),
         Button(50, 420, 200, 50, "Build City", (255, 165, 0), lambda: build_city(board, current_player)),
         Button(50, 480, 200, 50, "Buy Dev Card", (128, 0, 128), lambda: buy_dev_card(board, current_player)),
         Button(50, 540, 200, 50, "End Turn", (255, 0, 0), lambda: end_turn(board))
@@ -419,41 +495,7 @@ def maketurn(board, players, screen,vertex_positions):
         button.draw(screen)
 
     pygame.display.flip()
-
-    # Wait for button clicks
-    while True:
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                pygame.quit()
-                return
-            elif event.type == pygame.MOUSEBUTTONDOWN:
-                pos = pygame.mouse.get_pos()
-                for button in buttons:
-                    if button.is_clicked(pos):
-                        button.action()  # Execute the button action
-                        return  # Exit turn UI loop
-
-def build_settlement(board,player):
-    return True
-
-def build_city(board,player):
-    return True
-
-def buy_dev_card(board,player):
-    return True
-
-def build_road(board,edge):
-    board.edges.append(edge)
-
-def end_turn(board):
-    if board.turn==4:
-        board.turn=1
-    else:
-        board.turn +=1 
-    return True
-
-
-
+    return buttons
 
 
 def main():
@@ -483,7 +525,7 @@ def main():
     setup_complete = False #change to start game 
     main_game = True #toggle these two to start
     running = True
-    
+    make_board(screen, board)  # make board
     while running:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
@@ -515,4 +557,3 @@ if __name__ == "__main__":
 # IMPLEMENT DEV CARDS, 
 # ENSURE FIRST ROAD MUST BE BUILD ATTACHED TO SETTLEMENT, 
 # roads build on top of eachoehtre 
-
