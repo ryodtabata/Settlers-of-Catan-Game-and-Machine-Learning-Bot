@@ -132,6 +132,7 @@ class Player():
     def build_city(self,board,vertex):
         board.vertices[vertex].owner = self.name
         board.vertices[vertex].type = "city"
+        board.vertices[vertex].buildable = False
         self.points = self.points+1    
     
 

@@ -2,36 +2,29 @@ import pygame
 import math
 import random
 from classtypes import *
-
-
-
 # Screen Dimensions
 WIDTH, HEIGHT = 1200, 800
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
 pygame.display.set_caption("Settlers of Catan Board")
-
 # Hexagon Size
 HEX_SIZE = 60
 CLICK_RADIUS = 10
 turn_ended = False
 # Colors
-# update colour later, with pictures
 WHITE = (255, 255, 255)
 BLACK = (0, 0, 0)
 RED = (255, 0, 0)
 GREEN = (0, 255, 0)
 YELLOW = (255, 255, 0)
 GRAY = (169, 169, 169)
-
-# Load images for each resource
+#load images for each resource
 WOOD_IMAGE = pygame.image.load("images/wood.jpeg")
 BRICK_IMAGE = pygame.image.load("images/brick.jpeg")
 WHEAT_IMAGE = pygame.image.load("images/wheat.jpg")
 SHEEP_IMAGE = pygame.image.load("images/sheep.jpeg")
 ORE_IMAGE = pygame.image.load("images/ore.jpeg")
 DESERT_IMAGE = pygame.image.load("images/desert.jpeg")
-
-# Dictionary mapping resources to their images
+#dictionary mapping resources to their images
 RESOURCE_IMAGES = {
     "wood": WOOD_IMAGE,
     "brick": BRICK_IMAGE,
@@ -39,15 +32,6 @@ RESOURCE_IMAGES = {
     "sheep": SHEEP_IMAGE,
     "ore": ORE_IMAGE,
     "desert": DESERT_IMAGE,
-}
-
-RESOURCES_COLORS = {
-    "wood": GREEN,
-    "brick": RED,
-    "sheep": WHITE,
-    "wheat": YELLOW,
-    "ore": GRAY,
-    "desert": (210, 180, 140),
 }
 
 TOUCHING_HEXIGONS = {
@@ -72,6 +56,7 @@ TOUCHING_HEXIGONS = {
     18: [14, 15, 17]       # Bottom right corner
 }
 
+#layout for hexigon creation
 LAYOUT = layout = [
     (-2, 2), (0, 2), (2, 2),        # Top row
     (-3, 1), (-1, 1), (1, 1), (3, 1),  # Second row
@@ -80,10 +65,11 @@ LAYOUT = layout = [
     (-2, -2), (0, -2), (2, -2)     # Bottom row
 ]
 
+#mask fucntion adds skin to each hexigon
 def hex_mask(size):
-    """Creates a hexagonal mask surface."""
+    
     mask = pygame.Surface((size * 2, size * 2), pygame.SRCALPHA)
-    mask.fill((0, 0, 0, 0))  # Transparent background
+    mask.fill((0, 0, 0, 0))  
 
     hex_points = [
         (
@@ -115,7 +101,7 @@ def create_tiles():
 #give position for each hexigon, so we know where it is on the board
 def hex_cords(tiles):
     for tile, (grid_x, grid_y) in zip(tiles, LAYOUT):
-        # Calculate pixel coordinates for the hexagon center
+        # \pixel coordinates for the hexagon center
         x_center = WIDTH // 2 + grid_x * HEX_SIZE * .85
         y_center = HEIGHT // 2 - grid_y * HEX_SIZE * 1.45
         # Add x_center and y_center to the tile object
@@ -129,7 +115,6 @@ def is_within_threshold(coord1, coord2, threshold):
 
 def create_vertex_for_hex(tiles):
     """
-    Returns:
         hex_to_verts: Dictionary mapping tile numbers to their vertex IDs.
         vertices: Dictionary mapping vertex IDs to Vertex objects.
     """
@@ -240,7 +225,7 @@ def make_board(screen, board):
             if vertex.type == "settlement":
                 pygame.draw.circle(screen, color, (int(x), int(y)), 10)
             elif vertex.type == "city":
-                pygame.draw.circle(screen, color, (int(x), int(y)), 12)
+                pygame.draw.circle(screen, color, (int(x), int(y)), 15)
 
         for edge in board.edges:
             x1, y1 = edge.vertex1.cords
@@ -275,15 +260,9 @@ def rolldice():
     return die1+die2
 
 def make_unbuildable(cords, vertex_positions, board, radius=80):
-    """
-    Marks vertices within a given radius as unbuildable.
-    
-    Parameters:
-    - cords: The center position (x, y) around which to create the unbuildable circle.
-    - vertex_positions: Dictionary of vertex positions {vertex: (x, y)}.
-    - board: The game board object that contains vertex properties.
-    - radius: The radius of the circle within which vertices become unbuildable.
-    """
+   
+    #Marks vertices within a given radius as unbuildable
+   
     for position, vertex in vertex_positions.items():
         # Calculate the Euclidean distance from the center to each vertex
         distance = math.sqrt((cords[0] - position[0])**2 + (cords[1] - position[1])**2)
@@ -316,7 +295,6 @@ def initialsetup(event, players, board, turns, vertex_positions,screen):
                     return True
     return False
 
-
 #helper fucntion for the first roads
 def first_road(board, current_player, vertex_positions, target_vertex):
     running = True
@@ -339,8 +317,10 @@ def is_adjacent(board, v1, v2):
 #distrributes all the resources for each roll
 def distribute_rrs(roll,board,hex_to_verts,players):
     if roll == 7:
+        print("robber needs to be implemented")
         return True
     for tile in hex_to_verts[roll]:
+
         for vertex in hex_to_verts[roll][tile]:
             if board.vertices[vertex].type=="settlement":
                 name = board.vertices[vertex].owner
@@ -372,15 +352,12 @@ def maketurn(board, players, screen,vertex_positions):
                 for button in buttons:
                     if button.is_clicked(pos):
                         button.action()  # Execute the button action
-                        HUD(board, players, screen,vertex_positions)
-        
-                        
+                        HUD(board, players, screen,vertex_positions)          
         if turn_ended:
             # Logic to proceed to the next turn goes here
             print("next turn.")
             turn_ended = False  # Reset the flag for the next turn
             return True
-
 
 def reachable(board,player,vertex):
     for edge in board.edges:
@@ -403,7 +380,6 @@ def build_settlement(board,player,vertex_positions):
 
     while True:
         for event in pygame.event.get():
-            print(event)
             if event.type == pygame.MOUSEBUTTONDOWN:
                 cords = event.pos
                 for position, vertex in vertex_positions.items():
@@ -413,15 +389,49 @@ def build_settlement(board,player,vertex_positions):
                         if board.vertices[vertex].buildable==True and reachable(board,player,vertex):
                             player.build_settlement(board, vertex)  #ent
                             make_unbuildable(cords,vertex_positions,board)
-                            make_board(screen, board)  # Redraw the board
-                            pygame.display.flip()  # Update the display
+                            make_board(screen,board)
+                            pygame.display.update() 
+
+                            
                             # for r in rrs:
                             #     player.resources[r] = player.resources[r]-1
-                            return
-                        return
                             
-def build_city(board,player):
-    return True
+                        return
+        make_board(screen,board)
+        pygame.display.update() 
+                    
+                            
+def build_city(board, player, vertex_positions):
+    rrs = ['wheat', 'wheat', 'ore', 'ore', 'ore']  # Resources required to build a city
+
+    while True:
+        for event in pygame.event.get():
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                cords = event.pos
+                for position, vertex in vertex_positions.items():
+                    # Calculate the distance between the click and the vertex
+                    distance = math.sqrt((cords[0] - position[0])**2 + (cords[1] - position[1])**2)
+                    if distance <= CLICK_RADIUS:
+                        # Check if the player owns the vertex and has enough resources to build a city
+                        print(player.name)
+                        print(board.vertices[vertex].owner)
+                        if board.vertices[vertex].owner == player.name and board.vertices[vertex].type== "settlement":
+                            # Check if the player has enough resources to build a city
+                            # if player.has_resources(rrs):
+                            player.build_city(board,vertex)  # Call the build_city method
+                            make_board(screen, board)
+                            pygame.display.update() 
+                            print('City built')
+                            return  # Exit after successfully building the city
+                    else:
+                        continue
+                          # Exit if the player does not own the vertex
+                else:
+                    print('not valid location')
+                    return
+
+        make_board(screen, board)  # Update the board display
+        pygame.display.update()  # Refresh the screen after each event
 
 def buy_dev_card(board,player):
     return True
@@ -429,14 +439,13 @@ def buy_dev_card(board,player):
 
 def build_road(board, current_player, vertex_positions):
     verts = []
+    rrs = ['wood','brick']
     running = True
     
     while running:
         for event in pygame.event.get():
             if event.type == pygame.MOUSEBUTTONDOWN:
                 cords = event.pos
-                print(cords)
-
                 # Find the vertex closest to the mouse click
                 for position, vertex in vertex_positions.items():
                     distance = math.sqrt((cords[0] - position[0])**2 + (cords[1] - position[1])**2)
@@ -535,7 +544,7 @@ def HUD(board, players, screen,vertex_positions):
     buttons = [
         Button(50, 300, 200, 50, "Build Road", (0, 128, 255), lambda: build_road(board, current_player, vertex_positions)),
         Button(50, 360, 200, 50, "Build Settlement", (0, 128, 0), lambda: build_settlement(board, current_player,vertex_positions)),
-        Button(50, 420, 200, 50, "Build City", (255, 165, 0), lambda: build_city(board, current_player)),
+        Button(50, 420, 200, 50, "Build City", (255, 165, 0), lambda: build_city(board, current_player,vertex_positions)),
         Button(50, 480, 200, 50, "Buy Dev Card", (128, 0, 128), lambda: buy_dev_card(board, current_player)),
         Button(50, 540, 200, 50, "End Turn", (255, 0, 0), lambda: end_turn(board))
     ]
@@ -601,9 +610,7 @@ if __name__ == "__main__":
 
 
 #THINGS THAT NEED TO BE DONE:   
-# BUILDING ROADS, 
-# SETTLEMTNS, check if is connected via road 
-# CITIES, 
-# IMPLEMENT DEV CARDS, 
-# ENSURE FIRST ROAD MUST BE BUILD ATTACHED TO SETTLEMENT, 
-# roads build on top of eachoehtre 
+# BUILDING ROADS not on top of eacother , 
+# IMPLEMENT DEV CARDS,  
+#largest army.
+#robber
