@@ -37,8 +37,6 @@ class Board():
         self.edges = []
         self.turn = random.randint(1,4)
         self.vertices = vertices
-        self.setupstage = True
-        self.maingame = False 
         self.longest_road = None
         self.largest_army = None
         self.adj_matrix = {

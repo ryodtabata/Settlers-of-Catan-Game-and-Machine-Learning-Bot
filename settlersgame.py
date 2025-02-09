@@ -328,9 +328,9 @@ def first_road(board, current_player, vertex_positions, target_vertex):
                     for position, vertex in vertex_positions.items():
             # Calculate the distance between the click and the vertex
                         distance = math.sqrt((cords[0] - position[0])**2 + (cords[1] - position[1])**2)
-                        if distance <= CLICK_RADIUS and vertex in board.adj_matrix[target_vertex]:
+                        if distance <= CLICK_RADIUS and vertex in verts:
                             edge = Edge(board.vertices[target_vertex],board.vertices[vertex],current_player.name)
-                            build_road(board,edge)
+                            board.edges.append(edge)
                             running = False 
 
 def is_adjacent(board, v1, v2):
@@ -380,20 +380,26 @@ def maketurn(board, players, screen,vertex_positions):
             print("next turn.")
             turn_ended = False  # Reset the flag for the next turn
             return True
-                        
+
+
+def reachable(board,player,vertex):
+    for edge in board.edges:
+        if edge.owner==player.name:
+          
+            if vertex == edge.vertex1.id or vertex == edge.vertex2.id:
+                return True
+    return False
+
 
 def build_settlement(board,player,vertex_positions):
-    rrs = ['wheat','sheep','brick','wood']
-    for r in rrs:
-        if r not in player.resources:
-            print("does not have")
-            return 
-        elif player.resources[r]<1:
-            print("cannot afford")
-            return
-
-    for r in rrs:
-        player.resources[r] = player.resources[r]-1
+    # rrs = ['wheat','sheep','brick','wood']
+    # for r in rrs:
+    #     if r not in player.resources:
+    #         print("does not have")
+    #         return 
+    #     elif player.resources[r]<1:
+    #         print("cannot afford")
+    #         return
 
     while True:
         for event in pygame.event.get():
@@ -404,12 +410,15 @@ def build_settlement(board,player,vertex_positions):
                 # Calculate the distance between the click and the vertex
                     distance = math.sqrt((cords[0] - position[0])**2 + (cords[1] - position[1])**2)
                     if distance <= CLICK_RADIUS:
-                        if board.vertices[vertex].buildable==True:
+                        if board.vertices[vertex].buildable==True and reachable(board,player,vertex):
                             player.build_settlement(board, vertex)  #ent
                             make_unbuildable(cords,vertex_positions,board)
                             make_board(screen, board)  # Redraw the board
                             pygame.display.flip()  # Update the display
+                            # for r in rrs:
+                            #     player.resources[r] = player.resources[r]-1
                             return
+                        return
                             
 def build_city(board,player):
     return True
@@ -417,8 +426,49 @@ def build_city(board,player):
 def buy_dev_card(board,player):
     return True
 
-def build_road(board,edge):
-    board.edges.append(edge)
+
+def build_road(board, current_player, vertex_positions):
+    verts = []
+    running = True
+    
+    while running:
+        for event in pygame.event.get():
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                cords = event.pos
+                print(cords)
+
+                # Find the vertex closest to the mouse click
+                for position, vertex in vertex_positions.items():
+                    distance = math.sqrt((cords[0] - position[0])**2 + (cords[1] - position[1])**2)
+                    
+                    if distance <= CLICK_RADIUS:  # The click is within range of a vertex
+                        if len(verts) == 0:  # First click, record the vertex
+                            if reachable(board, current_player, vertex):
+                                verts.append(vertex)
+                                print('First vertex reachable:', vertex)
+                                break  # Exit the loop after selecting the first vertex
+                            else:
+                                print("Vertex not reachable.")
+                                return  # Return early if the first vertex is not reachable
+                        
+                        else:  # Second click, check if it's valid
+                            if vertex in board.adj_matrix[verts[0]]:  # Check adjacency
+                                verts.append(vertex)
+                                edge = Edge(board.vertices[verts[0]], board.vertices[verts[1]], current_player.name)
+                                board.edges.append(edge)
+                                print(f"Road built between {verts[0]} and {verts[1]}")
+                                running = False  # Stop the loop after the second vertex is selected and road is built
+                                break  # Exit the loop after building the road
+                            else:
+                                print("Second vertex is not adjacent.")
+                                verts.clear()  # Clear the vertex list to allow retrying
+                                break  # Exit to start over with a new selection
+        make_board(screen,board)
+        pygame.display.update()  # Update the display after processing events
+
+    return
+        
+        
 
 def end_turn(board):
     global turn_ended
@@ -483,7 +533,7 @@ def HUD(board, players, screen,vertex_positions):
 
     # Create action buttons
     buttons = [
-        Button(50, 300, 200, 50, "Build Road", (0, 128, 255), lambda: build_road(board, players, vertex_positions,current_player)),
+        Button(50, 300, 200, 50, "Build Road", (0, 128, 255), lambda: build_road(board, current_player, vertex_positions)),
         Button(50, 360, 200, 50, "Build Settlement", (0, 128, 0), lambda: build_settlement(board, current_player,vertex_positions)),
         Button(50, 420, 200, 50, "Build City", (255, 165, 0), lambda: build_city(board, current_player)),
         Button(50, 480, 200, 50, "Buy Dev Card", (128, 0, 128), lambda: buy_dev_card(board, current_player)),
@@ -552,7 +602,7 @@ if __name__ == "__main__":
 
 #THINGS THAT NEED TO BE DONE:   
 # BUILDING ROADS, 
-# SETTLEMTNS, 
+# SETTLEMTNS, check if is connected via road 
 # CITIES, 
 # IMPLEMENT DEV CARDS, 
 # ENSURE FIRST ROAD MUST BE BUILD ATTACHED TO SETTLEMENT, 
