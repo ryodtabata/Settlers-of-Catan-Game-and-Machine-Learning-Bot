@@ -4,7 +4,6 @@ import random
 from classtypes import *
 
 # Screen Dimensions
-
 WIDTH, HEIGHT = 1200, 800
 SCREEN = pygame.display.set_mode((WIDTH, HEIGHT))
 pygame.display.set_caption("Settlers of Catan Board")
@@ -12,6 +11,9 @@ pygame.font.init()
 # Hexagon size
 HEX_SIZE = 60
 CLICK_RADIUS = 10
+
+DEV_CARDS = ["K","K","K","K","K","K","K","K","K","K","K","K","K","K","VP","VP","VP","VP","VP","ROAD","ROAD","YEAR","YEAR","MONOPOLY","MONOPOLY"]
+random.shuffle(DEV_CARDS)
 
 # Colors
 WHITE = (255, 255, 255)
@@ -29,9 +31,7 @@ BUTTON_MARGIN = 10
 BUTTON_WIDTH = 230
 BUTTON_HEIGHT = 40
 SECTION_SPACING = 20  # Space between sections
-
 PLAYER_DIC = {'player1':0,'player2':1,'player3':2,'player4':3}
-
 
 #load images for each resource
 WOOD_IMAGE = pygame.image.load("images/wood.jpeg")
@@ -419,10 +419,13 @@ def first_road(board, current_player, target_vertex):
                 return
 
 #function for handing out resources
-def distribute_rrs(board,roll,players):
+def distribute_rrs(board,roll,players,turn):
     print(roll)
     if roll == 7:
-        #do some stuff
+        display_message(f"7 rolled! Move the Robber!", 62)
+        overseven(players)
+        rob(board,players,turn)
+        make_board(board)
         return
 
     for tile in board.tiles:
@@ -512,7 +515,7 @@ def make_turn(board, turn, players):
                 display_message(f"{players[turn].name}'s turn, press space to roll!", 62)
                 if event.type == pygame.KEYDOWN and event.key == pygame.K_SPACE:
                     roll = rolldice()
-                    distribute_rrs(board, roll, players)
+                    distribute_rrs(board, roll, players,turn)
                     rolled = True
             else:
                 display_message(f"{roll} was rolled", 62)
@@ -535,6 +538,7 @@ def make_turn(board, turn, players):
                         elif button_y_start + 120 <= mouse_pos[1] <= button_y_start + 120 + BUTTON_HEIGHT:
                             # Build City
                             print("Build City clicked")
+                            build_city(board,players[turn])
 
                         elif button_y_start + 180 <= mouse_pos[1] <= button_y_start + 180 + BUTTON_HEIGHT:
                             # Buy Dev Card
@@ -561,11 +565,12 @@ def end_turn(board,turn,players):
         turn = turn+1
     make_turn(board, turn, players)
 
-#checks if the vertex is reachable
+#checks if the vertex is reachable, need to fix it so cannot build over top of an edge
 def reachable(board,player,vertex):
+    
     for edge in board.edges:
         if edge.owner==player.name:
-            if vertex == edge.vertex1.id or vertex == edge.vertex2.id:
+            if vertex.id == edge.vertex1.id or vertex.id == edge.vertex2.id:
                 return True
     return False
 
@@ -577,7 +582,6 @@ def build_settlement(board,player):
         if r not in player.resources or player.resources[r]<1:
             print("does not have enough resources")
             return 
-        
     while True:
         for event in pygame.event.get():
             if event.type == pygame.MOUSEBUTTONDOWN:
@@ -586,12 +590,12 @@ def build_settlement(board,player):
                 # Calculate the distance between the click and the vertex
                     if is_close_enough(cords, vertex.cords, threshold=8):
                         if vertex.buildable==True and reachable(board,player,vertex):
-                            player.build_settlement(board, vertex)  #ent
+                            player.build_settlement(board, id)  #ent
                             make_unbuildable(cords,board)
-                            make_board(SCREEN,board)
+                            make_board(board)
                             pygame.display.update() 
                             for r in rrs:
-                                player.resources[r] = player.resources[r]-1
+                                player.resources[r]-=1
                         return
         make_board(board)
         pygame.display.update() 
@@ -605,7 +609,7 @@ def build_road(board,player):
         if r not in player.resources or player.resources[r]<1:
             print("does not have enough resources")
             return 
-    
+        
     while running:
         for event in pygame.event.get():
             if event.type == pygame.MOUSEBUTTONDOWN:
@@ -614,139 +618,137 @@ def build_road(board,player):
                 for id, vertex in board.vertices.items():
                     # add the checker
                     if is_close_enough(cords, vertex.cords, threshold=8):
-                   
                         if len(verts) == 0:  # First click, record the vertex
                             if reachable(board, player, vertex):
-                                verts.append(vertex)
+                                verts.append(vertex.id)
                                 print('First vertex reachable:', vertex)
-                                break  # Exit the loop after selecting the first vertex
+                                break  #Exit the loop after selecting the first vertex
                             else:
                                 print("Vertex not reachable.")
                                 return  # Return early if the first vertex is not reachable
-                        
-                        else:  # Second click, check if it's valid
-                            if vertex in board.adj_matrix[verts[0]]:  # Check adjacency
-                                verts.append(vertex)
-                                edge = Edge(board.vertices[verts[0]], board.vertices[verts[1]], player.name)
+                            
+                        else:  #Second click, check if it's valid
+                            if vertex.id in ADJ_MATRIX[verts[0]]:  #Check adjacency
+                                verts.append(vertex.id)
+                                edge = Edge(board.vertices[verts[0]], board.vertices[verts[1]], player.name,player.color)
                                 board.edges.append(edge)
+                                for r in rrs:
+                                    player.resources[r]-=1
                                 print(f"Road built between {verts[0]} and {verts[1]}")
-                                running = False  # Stop the loop after the second vertex is selected and road is built
-                                break  # Exit the loop after building the road
+                                running = False  
+                                break  
                             else:
                                 print("Second vertex is not adjacent.")
-                                verts.clear()  # Clear the vertex list to allow retrying
-                                break  # Exit to start over with a new selection
+                                verts.clear()  
+                                break  
         make_board(board)
-        pygame.display.update()  # Update the display after processing events
+        pygame.display.update()  
 
     return
-        
-# def overseven(players):
 
-#     for player in players:
-#         total = sum(player.resources.values())  # Total resources count
-        
-#         if total >= 8:
-#             to_remove = math.floor(total / 2)
-#             resources = list(player.resources.keys())
-#             count = 0
-            
-#             while count < to_remove:
-            
-#                 resource = random.choice(resources)
-#                 if resource not in player.resources:
-#                     resources.remove(resource)
+#builds a city
+def build_city(board, player):
+
+    rrs = ['wheat', 'wheat', 'ore', 'ore', 'ore']  # Resources required to build a city
+    if player.resources['wheat']<2 or player.resources['ore']<3:
+        print('player does not have rrs')
+        return 
+
+    while True:
+        for event in pygame.event.get():
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                cords = event.pos
+                for id, vertex in board.vertices.items():
+                    # Calculate the distance between the click and the vertex
+                    if is_close_enough(cords, vertex.cords, threshold=8):
+                        # Check if the player owns the vertex and has enough resources to build a city
+                        if board.vertices[id].owner == player.name and board.vertices[id].type== "settlement":
+                            player.build_city(board,id)  # Call the build_city method
+                            make_board(board)
+                            pygame.display.update() 
+                            for r in rrs:
+                                player.resources[r]-= 1
+                            print('City built')
+                            return  
+                    else:
+                        continue
+                          #Exit if the player does not own the vertex
+                else:
+                    print('not valid location')
+                    return
+
+        make_board(board)  # Update the board display
+        pygame.display.update()  # Refresh the screen after each event
+
+#randomly removes half if over 7
+def overseven(players):
+    for player in players:
+        total = sum(player.resources.values())  # Total resources count
+        if total >= 8:
+            to_remove = math.floor(total / 2)
+            resources = list(player.resources.keys())
+            count = 0
+            while count < to_remove:
+                resource = random.choice(resources)
+                if resource not in player.resources:
+                    resources.remove(resource)
                 
-#                 elif player.resources[resource] > 0: 
-#                     player.resources[resource] -= 1  
-#                     if player.resources[resource] == 0:  
-#                         del player.resources[resource]
-#                     count += 1 
-#                 else:
-#                     resources.remove(resource)  
+                elif player.resources[resource] > 0: 
+                    player.resources[resource] -= 1  
+                    if player.resources[resource] == 0:  
+                        del player.resources[resource]
+                    count += 1 
+                else:
+                    resources.remove(resource)  
 
-#     return
-        
-# def rob(board, players, hex_to_verts):
-#     turn = board.turn - 1  # Adjust for 0-based index
-#     current_player = players[turn]
+    return
+
+#randomly takes a card 
+def rob(board,players,turn):
+    current_player = players[turn]
+
     
-#     while True:
-#         for event in pygame.event.get():
-#             if event.type == pygame.QUIT:
-#                 pygame.quit()
-#                 return
+    while True:
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                return
 
-#             if event.type == pygame.MOUSEBUTTONDOWN:
-#                 cords = event.pos  # Get the mouse click coordinates
-#                 mouse_x, mouse_y = cords
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                cords = event.pos  # Get the mouse click coordinates
+                mouse_x, mouse_y = cords
 
-#                 #go over each tile and check if the click is within the hexagon
-#                 for tile in board.tiles:
-#                     x_center = tile.xcenter
-#                     y_center = tile.ycenter
+                #go over each tile and check if the click is within the hexagon
+                for tile in board.tiles:
+                    x_center = tile.xcenter
+                    y_center = tile.ycenter
 
-#                     #distance between the mouse click and the center of the tile
-#                     distance = math.sqrt((mouse_x - x_center) ** 2 + (mouse_y - y_center) ** 2)
+                    #distance between the mouse click and the center of the tile
+                    distance = math.sqrt((mouse_x - x_center) ** 2 + (mouse_y - y_center) ** 2)
 
-#                     #if the click is within the threshold 
-#                     if distance <= HEX_SIZE:
-#                         print(f"Clicked on tile at ({mouse_x}, {mouse_y}) with center at ({x_center}, {y_center})")
+                    #if the click is within the threshold 
+                    if distance <= HEX_SIZE:
+                        print(f"Clicked on tile at ({mouse_x}, {mouse_y}) with center at ({x_center}, {y_center})")
                         
-#                         # Check if the robber is already on the tile
-#                         if not hex_to_verts[tile.number]["robber"]:
-#                             # Place the robber on this tile
-#                             hex_to_verts[tile.number]["robber"] = True
-                            
-#                             print(f"Robber placed on tile {tile.number}")
-#                         else:
-#                             print(f"Tile {tile.number} already has the robber.")
+                        # Check if the robber is already on the tile
+                        if tile.robber == False:
+                            # Place the robber on this tile
+                            tile.robber = True
+                            current_robbed = tile.id 
+                            print(f"Robber placed on tile {tile.number}")
+                            #needs to steal from player
+                            for tile in board.tiles:
+                                if tile.robber == True and tile.id != current_robbed:
+                                    tile.robber = False
+                                
+                            return 
+                        else:
+                            print(f"Tile {tile.number} already has the robber.")
                         
-#                         #needs to steal from player
-                        
-#                         return  # Exit after handling the click
+                         
+    return
 
-#     return
-
-   # def build_city(board, player, vertex_positions):
-#     rrs = ['wheat', 'wheat', 'ore', 'ore', 'ore']  # Resources required to build a city
-
-#     while True:
-#         for event in pygame.event.get():
-#             if event.type == pygame.MOUSEBUTTONDOWN:
-#                 cords = event.pos
-#                 for position, vertex in vertex_positions.items():
-#                     # Calculate the distance between the click and the vertex
-#                     distance = math.sqrt((cords[0] - position[0])**2 + (cords[1] - position[1])**2)
-#                     if distance <= CLICK_RADIUS:
-#                         # Check if the player owns the vertex and has enough resources to build a city
-#                         print(player.name)
-#                         print(board.vertices[vertex].owner)
-#                         if board.vertices[vertex].owner == player.name and board.vertices[vertex].type== "settlement":
-#                             # Check if the player has enough resources to build a city
-#                             # if player.has_resources(rrs):
-#                             player.build_city(board,vertex)  # Call the build_city method
-#                             make_board(screen, board)
-#                             pygame.display.update() 
-#                             print('City built')
-#                             return  # Exit after successfully building the city
-#                     else:
-#                         continue
-#                           # Exit if the player does not own the vertex
-#                 else:
-#                     print('not valid location')
-#                     return
-
-#         make_board(screen, board)  # Update the board display
-#         pygame.display.update()  # Refresh the screen after each event
-
-# def buy_dev_card(board,player):
-#     return True
-
-
-
-
-
+#main function 
 def main():
     turn = random.randint(0,3)
     setup_phase = True
@@ -777,28 +779,43 @@ def main():
     turns = [0, 1, 2, 3, 3, 2, 1, 0]
     running = True 
 
-    while running:
-        make_board(board)
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                running = False
-            elif setup_phase:
-                setup_phase = initialsetup(players, board, turns)
-                main_phase = True
-            elif main_phase:
-                make_turn(board, turn, players)
-                turn = (turn + 1) % len(players)
-
-    #for testing
-    # PLAYER1.resources = {'wheat':121, 'brick':23, "ore":12,"sheep":12,'wood':23}
-    # PLAYER2.resources = {'wheat':4, 'brick':23, "ore":12,"sheep":12,'wood':23}
-    # PLAYER3.resources = {'wheat':151, 'brick':23, "ore":12,"sheep":12,'wood':23}
-    # PLAYER4.resources = {'wheat':11, 'brick':23, "ore":12,"sheep":12,'wood':23}
     # while running:
     #     make_board(board)
-    #     if not main_phase:
-    #         make_turn(board,turn,players)
+    #     for event in pygame.event.get():
+    #         if event.type == pygame.QUIT:
+    #             running = False
+    #         elif setup_phase:
+    #             setup_phase = initialsetup(players, board, turns)
+    #             main_phase = True
+    #         elif main_phase:
+    #             make_turn(board, turn, players)
+    #             turn = (turn + 1) % len(players)
+
+    #for testing
+    PLAYER1.resources = {'wheat':121, 'brick':23, "ore":12,"sheep":12,'wood':23}
+    PLAYER2.resources = {'wheat':4, 'brick':23, "ore":12,"sheep":12,'wood':23}
+    PLAYER3.resources = {'wheat':151, 'brick':23, "ore":12,"sheep":12,'wood':23}
+    PLAYER4.resources = {'wheat':11, 'brick':23, "ore":12,"sheep":12,'wood':23}
+    while running:
+        make_board(board)
+        if not main_phase:
+            make_turn(board,turn,players)
 
 
 if __name__ == "__main__":
     main()
+
+
+
+
+
+# building roads ontop of eachother, 
+# needs to be able to pick who to steal from when rolling a 7 
+# development cards, 
+# when game gets to 10, 
+# give players startiong cards,
+# check for largest army and longest road 
+# limit number of houses and cities and roads 
+
+
+# a couple notes: when a 7 is rolled, you do not get to choose which cards you remove, it is random

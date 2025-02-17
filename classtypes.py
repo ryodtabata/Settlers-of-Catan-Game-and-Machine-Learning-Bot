@@ -61,7 +61,7 @@ class Player():
         board.vertices[vertex].owner = self.name
         board.vertices[vertex].type = "city"
         board.vertices[vertex].buildable = False
-        board.verteces[vertex].color = self.color
+        board.vertices[vertex].color = self.color
         self.points = self.points+1    
     
     def build_road(self,board,vertex1,vertex2):
