@@ -779,34 +779,31 @@ def main():
     turns = [0, 1, 2, 3, 3, 2, 1, 0]
     running = True 
 
-    # while running:
-    #     make_board(board)
-    #     for event in pygame.event.get():
-    #         if event.type == pygame.QUIT:
-    #             running = False
-    #         elif setup_phase:
-    #             setup_phase = initialsetup(players, board, turns)
-    #             main_phase = True
-    #         elif main_phase:
-    #             make_turn(board, turn, players)
-    #             turn = (turn + 1) % len(players)
-
-    #for testing
-    PLAYER1.resources = {'wheat':121, 'brick':23, "ore":12,"sheep":12,'wood':23}
-    PLAYER2.resources = {'wheat':4, 'brick':23, "ore":12,"sheep":12,'wood':23}
-    PLAYER3.resources = {'wheat':151, 'brick':23, "ore":12,"sheep":12,'wood':23}
-    PLAYER4.resources = {'wheat':11, 'brick':23, "ore":12,"sheep":12,'wood':23}
     while running:
         make_board(board)
-        if not main_phase:
-            make_turn(board,turn,players)
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                running = False
+            elif setup_phase:
+                setup_phase = initialsetup(players, board, turns)
+                main_phase = True
+            elif main_phase:
+                make_turn(board, turn, players)
+                turn = (turn + 1) % len(players)
+
+    #for testing
+    # PLAYER1.resources = {'wheat':121, 'brick':23, "ore":12,"sheep":12,'wood':23}
+    # PLAYER2.resources = {'wheat':4, 'brick':23, "ore":12,"sheep":12,'wood':23}
+    # PLAYER3.resources = {'wheat':151, 'brick':23, "ore":12,"sheep":12,'wood':23}
+    # PLAYER4.resources = {'wheat':11, 'brick':23, "ore":12,"sheep":12,'wood':23}
+    # while running:
+    #     make_board(board)
+    #     if not main_phase:
+    #         make_turn(board,turn,players)
 
 
 if __name__ == "__main__":
     main()
-
-
-
 
 
 # building roads ontop of eachother, 
