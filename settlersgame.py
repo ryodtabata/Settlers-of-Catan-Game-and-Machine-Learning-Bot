@@ -543,6 +543,7 @@ def make_turn(board, turn, players):
                         elif button_y_start + 180 <= mouse_pos[1] <= button_y_start + 180 + BUTTON_HEIGHT:
                             # Buy Dev Card
                             print("Buy Dev Card clicked")
+                            buy_dev_card(board,players[turn])
 
                         elif button_y_start + 180 <= mouse_pos[1] <= button_y_start + 240 + BUTTON_HEIGHT:
                             # end turn
@@ -650,6 +651,9 @@ def build_road(board,player):
 def build_city(board, player):
 
     rrs = ['wheat', 'wheat', 'ore', 'ore', 'ore']  # Resources required to build a city
+    if 'wheat' not in player.resources or 'ore' not in player.resources:
+        return
+        
     if player.resources['wheat']<2 or player.resources['ore']<3:
         print('player does not have rrs')
         return 
@@ -706,8 +710,6 @@ def overseven(players):
 #randomly takes a card 
 def rob(board,players,turn):
     current_player = players[turn]
-
-    
     while True:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
@@ -736,7 +738,14 @@ def rob(board,players,turn):
                             tile.robber = True
                             current_robbed = tile.id 
                             print(f"Robber placed on tile {tile.number}")
+                            stealable_players= []
+                            for vert in tile.verts:
+                                if board.vertices[vert].owner!= None:
+                                    stealable_players.append(vert)
+                            choose_to_steal(current_player,stealable_players,players,board)
+
                             #needs to steal from player
+                            #removes the robber from the other tiles
                             for tile in board.tiles:
                                 if tile.robber == True and tile.id != current_robbed:
                                     tile.robber = False
@@ -747,6 +756,54 @@ def rob(board,players,turn):
                         
                          
     return
+
+#fucntion allows user to select who to steal card from
+def choose_to_steal(current_player,stealable_players,players,board):
+    if len(stealable_players) == 0:
+        return
+    display_message(f"Choose a player to steal from. Click their settlment",62)
+    while True:
+        for event in pygame.event.get():
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                cords = event.pos
+                for position, vertex in board.vertices.items():
+                    if is_close_enough(cords, vertex.cords, threshold=8) and position in stealable_players:
+                        steal_name = board.vertices[position].owner
+                        steal_choices = []
+                        for player in players:
+                            if player.name == steal_name:
+                                temp = player
+                                for rrs in player.resources:
+                                    if player.resources[rrs] >0:
+                                        steal_choices.append(rrs)
+                        if len(steal_choices)== 0: 
+                            return  
+                        else:
+                            r = random.choice(steal_choices)
+                            temp.resources[r]-=1
+                            if r in current_player.resources:
+                                current_player.resources[r]+=1
+                                print(current_player.name,r)
+                                return
+                            else:
+                                current_player.resources[r]=1
+                                print(current_player.name,r)
+                                return
+                                    
+
+def buy_dev_card(board,player):
+    rrs = ["wheat","sheep","ore"]
+    return True
+            
+    
+
+
+
+
+
+
+
+
 
 #main function 
 def main():
@@ -807,12 +864,12 @@ if __name__ == "__main__":
 
 
 # building roads ontop of eachother, 
-# needs to be able to pick who to steal from when rolling a 7 
 # development cards, 
 # when game gets to 10, 
 # give players startiong cards,
 # check for largest army and longest road 
 # limit number of houses and cities and roads 
+#trading  
 
 
-# a couple notes: when a 7 is rolled, you do not get to choose which cards you remove, it is random
+# a couple notes: when a 7 is rolled, you do not get to choose which cards you remove, it is random... need to fix it so updatezs the board, when removing half of the cards
