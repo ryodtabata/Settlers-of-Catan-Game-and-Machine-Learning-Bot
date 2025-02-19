@@ -2,6 +2,16 @@
 import random
 import pygame
 
+
+WHITE = (255, 255, 255)
+BLACK = (0, 0, 0)
+RED = (255, 0, 0)
+GREEN = (0, 255, 0)
+YELLOW = (255, 255, 0)
+GRAY = (169, 169, 169)
+BLUE = (0, 0, 255)
+ORANGE = (255, 165, 0)
+
 #each hextile on the game board
 class HexTile:
     def __init__(self, resource, number, id):
@@ -49,6 +59,7 @@ class Player():
         self.rewards = [] #longest road, largest army
         self.name = name
         self.color = color
+        self.knightsplayed = 0
     
     def build_settlement(self,board,vertex):
         board.vertices[vertex].owner = self.name
@@ -68,20 +79,8 @@ class Player():
         edge = Edge(vertex1,vertex2,self.name,self.color)
         board.edges.append(edge)
     
-# Button class to simplify button handling
-class Button:
-    def __init__(self, x, y, width, height, text, color, action):
-        self.rect = pygame.Rect(x, y, width, height)
-        self.text = text
-        self.color = color
-        self.action = action
-        self.font = pygame.font.Font(None, 30)
 
-    def draw(self, screen):
-        pygame.draw.rect(screen, self.color, self.rect)
-        text_surface = self.font.render(self.text, True, (255, 255, 255))
-        text_rect = text_surface.get_rect(center=self.rect.center)
-        screen.blit(text_surface, text_rect)
+    
 
-    def is_clicked(self, pos):
-        return self.rect.collidepoint(pos)
+
+

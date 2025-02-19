@@ -12,7 +12,7 @@ pygame.font.init()
 HEX_SIZE = 60
 CLICK_RADIUS = 10
 
-DEV_CARDS = ["K","K","K","K","K","K","K","K","K","K","K","K","K","K","VP","VP","VP","VP","VP","ROAD","ROAD","YEAR","YEAR","MONOPOLY","MONOPOLY"]
+DEV_CARDS = ["Knight","Knight","Knight","Knight","Knight","Knight","Knight","Knight","Knight","Knight","Knight","Knight","Knight","Knight","VP","VP","VP","VP","VP","Road Builder","Road Builder","Year of Plenty","Year of Plenty","Monopoly","Monopoly"]
 random.shuffle(DEV_CARDS)
 
 # Colors
@@ -31,7 +31,16 @@ BUTTON_MARGIN = 10
 BUTTON_WIDTH = 230
 BUTTON_HEIGHT = 40
 SECTION_SPACING = 20  # Space between sections
+BUTTON_MARGIN = 10  # Horizontal margin for buttons
+BUTTON_SPACING = 25  # Vertical spacing between buttons
+
+DEV_BUTTON_MARGIN = 10
+DEV_BUTTON_WIDTH = 230
+DEV_BUTTON_HEIGHT = 20
+DEV_SECTION_SPACING = 100  # Space between sections
+
 PLAYER_DIC = {'player1':0,'player2':1,'player3':2,'player4':3}
+
 
 #load images for each resource
 WOOD_IMAGE = pygame.image.load("images/wood.jpeg")
@@ -480,8 +489,12 @@ def draw_sidebar(screen, player, rolled):
         resource_text = font.render(f"{resource}: {amount}", True, BLACK)
         screen.blit(resource_text, (screen.get_width() - SIDEBAR_WIDTH + 10, y_offset))
         y_offset += 30  # Increment y-offset for each resource
+    
 
-    # Draw the buttons section (only if dice has been rolled)
+    dev_text = font.render("Development Cards:", True, BLACK)
+    screen.blit(dev_text, (screen.get_width() - SIDEBAR_WIDTH + 10, 620))
+
+
     if rolled:
         # Calculate the starting y-offset for buttons
         button_start_y = 300 + SECTION_SPACING  # Add spacing after resources
@@ -492,8 +505,17 @@ def draw_sidebar(screen, player, rolled):
             ("Build Settlement", screen.get_width() - SIDEBAR_WIDTH + BUTTON_MARGIN, button_start_y + 60),
             ("Build City", screen.get_width() - SIDEBAR_WIDTH + BUTTON_MARGIN, button_start_y + 120),
             ("Buy Dev Card", screen.get_width() - SIDEBAR_WIDTH + BUTTON_MARGIN, button_start_y + 180),
-            ("End Turn", screen.get_width() - SIDEBAR_WIDTH + BUTTON_MARGIN, button_start_y + 240)
-        ]
+            ("End Turn", screen.get_width() - SIDEBAR_WIDTH + BUTTON_MARGIN, button_start_y + 240),
+        ]   
+        
+        
+        devbuttons = [
+                    ("Knight", screen.get_width() - SIDEBAR_WIDTH + BUTTON_MARGIN, 660),
+                    ("Monopoly", screen.get_width() - SIDEBAR_WIDTH + BUTTON_MARGIN, 660 + BUTTON_SPACING),
+                    ("Year of Plenty", screen.get_width() - SIDEBAR_WIDTH + BUTTON_MARGIN, 660 + 2 * BUTTON_SPACING),
+                    ("Road Builder", screen.get_width() - SIDEBAR_WIDTH + BUTTON_MARGIN, 660 + 3 * BUTTON_SPACING),
+                    ("VP", screen.get_width() - SIDEBAR_WIDTH + BUTTON_MARGIN, 660 + 4 * BUTTON_SPACING),
+                ]
 
         # Draw buttons
         for text, x, y in buttons:
@@ -502,6 +524,18 @@ def draw_sidebar(screen, player, rolled):
             text_surface = font.render(text, True, WHITE)
             screen.blit(text_surface, (x + 10, y + 10))
 
+        # Render buttons
+        for text, x, y in devbuttons:
+            if text in player.dev_cards:  # Check if the player has this type of card
+                card_count = player.dev_cards[text]  # Get the number of cards
+                button_rect = pygame.Rect(x, y, 230, 20)  # Button dimensions
+                pygame.draw.rect(screen, BLACK, button_rect)  # Draw button background
+
+                # Render the text with the card count
+                button_text = f"{text} ({card_count})"  # Combine text and card count
+                text_surface = font.render(button_text, True, WHITE)  # Render the text
+                screen.blit(text_surface, (x + 10, y + 2))  # Draw the text on the button
+        
 #main fucntion to control moves
 def make_turn(board, turn, players):
     rolled = False
@@ -529,7 +563,6 @@ def make_turn(board, turn, players):
                             print("Build Road clicked")
                             build_road(board,players[turn])
 
-
                         elif button_y_start + 60 <= mouse_pos[1] <= button_y_start + 60 + BUTTON_HEIGHT:
                             # Build Settlement
                             print("Build Settlement clicked")
@@ -545,21 +578,102 @@ def make_turn(board, turn, players):
                             print("Buy Dev Card clicked")
                             buy_dev_card(board,players[turn])
 
-                        elif button_y_start + 180 <= mouse_pos[1] <= button_y_start + 240 + BUTTON_HEIGHT:
+                        elif button_y_start + 240 <= mouse_pos[1] <= button_y_start + 240 + BUTTON_HEIGHT:
                             # end turn
                             print("End turn")
                             end_turn(board,turn,players)
                             return True
-                            
+                        
+                        elif button_y_start + 340 <= mouse_pos[1] <= button_y_start + 340 + DEV_BUTTON_HEIGHT:
+                            print("Pressed Knight")
+                            useknight(board,players,turn)
+
+                        elif button_y_start + 355 <= mouse_pos[1] <= button_y_start + 360 + DEV_BUTTON_HEIGHT:
+                            useMonopoly(board,players[turn],players)
+                            print("Pressed Monopoly")
+                        
+                        elif button_y_start + 385 <= mouse_pos[1] <= button_y_start + 385 + DEV_BUTTON_HEIGHT:
+                            useYOP(board,players[turn],players)
+                            print("Pressed Year of Plenty")
+
+                        elif button_y_start + 400 <= mouse_pos[1] <= button_y_start + 410 + DEV_BUTTON_HEIGHT:
+                            useroadbuilder(board,players[turn],players)
+                            print("Road Builder")
+
+                    
 
         # Draw the sidebar
         draw_sidebar(SCREEN, players[turn], rolled)
-
         # Update the display
         pygame.display.flip()
 
+def stealall(board,current_player,players):
+    display_message("Click resource tile to steal!", 62)
+    while True:
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                return
+
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                cords = event.pos  # Get the mouse click coordinates
+                mouse_x, mouse_y = cords
+
+                #go over each tile and check if the click is within the hexagon
+                for tile in board.tiles:
+                    x_center = tile.xcenter
+                    y_center = tile.ycenter
+
+                    #distance between the mouse click and the center of the tile
+                    distance = math.sqrt((mouse_x - x_center) ** 2 + (mouse_y - y_center) ** 2)
+
+                    #if the click is within the threshold 
+                    if distance <= HEX_SIZE:
+                        rtype = tile.resource
+                        count = 0
+                        for player in players:
+                            if rtype in player.resources:
+                                count += player.resources[rtype]
+                                player.resources[rtype] = 0
+                        
+                        if rtype in current_player.resources:
+                            current_player.resources[rtype] += count
+                            pygame.display.update()
+                            return
+                        else: 
+                            current_player.resources[rtype] = count
+                            pygame.display.update()
+                            return
+                        
+def useMonopoly(board,current_player,players):
+    if 'Monopoly' in current_player.dev_cards and current_player.dev_cards["Monopoly"]>=1:
+        stealall(board,current_player,players)
+        current_player.dev_cards["Monopoly"]-=1
+    return True
+
+def useYOP(board,current_player,players):
+    current_player.dev_cards["Year of Plenty"]-=1
+    return True
+
+def useroadbuilder(board,current_player,players):
+    current_player.dev_cards["Road Builder"]-=1
+    return True
+
+def useknight(board,players,turn):
+    if 'Knight' in players[turn].dev_cards and players[turn].dev_cards["Knight"]>=1:
+        display_message("Move the Knight!", 62)
+        rob(board,players,turn)
+        players[turn].dev_cards["Knight"]-=1
+        make_board(board)
+
+    return True
+    #chekc if we have a card because it is clickable whenever
+
 #ends turn
 def end_turn(board,turn,players):
+    if players[turn].points >=10:
+        return
+        #exit the game loop
     if turn == 3:
         turn =0
     else:
@@ -704,7 +818,7 @@ def overseven(players):
                     count += 1 
                 else:
                     resources.remove(resource)  
-
+    pygame.display.update() 
     return
 
 #randomly takes a card 
@@ -790,20 +904,35 @@ def choose_to_steal(current_player,stealable_players,players,board):
                                 print(current_player.name,r)
                                 return
                                     
-
+#funciton to process buying of dev cards
 def buy_dev_card(board,player):
     rrs = ["wheat","sheep","ore"]
-    return True
-            
+    if 'wheat' not in player.resources or 'ore' not in player.resources or "sheep" not in player.resources:
+        print("not enough resources")
+        return
     
+    if player.resources['wheat']<1 or player.resources['ore']<1 or player.resources['sheep']<1:
+        print('player does not have rrs')
+        return 
+    
+    if len(DEV_CARDS) == 0:
+        print("no dev cards left")
+        return
+   
+    else:
+        #player can afford
+        card = DEV_CARDS.pop()
+        if card not in player.dev_cards:
+            player.dev_cards[card] = 1
+        else:
+            player.dev_cards[card] += 1
+        if card == "VP":
+            player.points+=1
+        for r in rrs:
+            player.resources[r]-=1
 
-
-
-
-
-
-
-
+        make_board(board)
+        pygame.display.update() 
 
 #main function 
 def main():
@@ -849,7 +978,7 @@ def main():
                 turn = (turn + 1) % len(players)
 
     #for testing
-    # PLAYER1.resources = {'wheat':121, 'brick':23, "ore":12,"sheep":12,'wood':23}
+    # PLAYER1.resources = {'wheat':121, 'brick':23, "ore":1234,"sheep":1234,'wood':23}
     # PLAYER2.resources = {'wheat':4, 'brick':23, "ore":12,"sheep":12,'wood':23}
     # PLAYER3.resources = {'wheat':151, 'brick':23, "ore":12,"sheep":12,'wood':23}
     # PLAYER4.resources = {'wheat':11, 'brick':23, "ore":12,"sheep":12,'wood':23}
@@ -864,12 +993,14 @@ if __name__ == "__main__":
 
 
 # building roads ontop of eachother, 
-# development cards, 
 # when game gets to 10, 
 # give players startiong cards,
 # check for largest army and longest road 
 # limit number of houses and cities and roads 
-#trading  
+# trading  
+# show how many knights were used
+# finish year of plenty and longest road
 
 
-# a couple notes: when a 7 is rolled, you do not get to choose which cards you remove, it is random... need to fix it so updatezs the board, when removing half of the cards
+# a couple notes: when a 7 is rolled, you do not get to choose which cards you remove, it is random... 
+# dev cards can only be used once a turn, dev cards must wait a turn to use
