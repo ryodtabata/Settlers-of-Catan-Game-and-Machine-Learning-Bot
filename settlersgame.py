@@ -15,6 +15,20 @@ CLICK_RADIUS = 10
 DEV_CARDS = ["Knight","Knight","Knight","Knight","Knight","Knight","Knight","Knight","Knight","Knight","Knight","Knight","Knight","Knight","VP","VP","VP","VP","VP","Road Builder","Road Builder","Year of Plenty","Year of Plenty","Monopoly","Monopoly"]
 random.shuffle(DEV_CARDS)
 
+#for when a player wins
+font_game_over = pygame.font.Font(None, 100)
+font_winner = pygame.font.Font(None, 60)
+
+# Confetti settings
+CONFETTI_COUNT = 100
+confetti = [
+    [random.randint(0, WIDTH), random.randint(-HEIGHT, 0), random.choice([RED, YELLOW, BLUE, GREEN])]
+    for _ in range(CONFETTI_COUNT)
+]
+
+clock = pygame.time.Clock()
+
+
 # Colors
 WHITE = (255, 255, 255)
 BLACK = (0, 0, 0)
@@ -364,6 +378,14 @@ def initialsetup(players, board, turns):
                         if vertex.buildable:
                             current_player.build_settlement(board, vertexid)  
                             make_unbuildable(vertex.cords, board) 
+                            if current_player.points ==2:
+                                for tile in board.tiles:
+                                    if vertexid in tile.verts:
+                                        if tile.resource in current_player.resources:
+                                            current_player.resources[tile.resource]+=1
+                                        else:
+                                            current_player.resources[tile.resource] =1 
+                                            
                             make_board(board)
                             first_road(board,current_player,vertexid)
                             make_board(board)
@@ -465,7 +487,7 @@ def distribute_rrs(board,roll,players,turn):
     return
 
 #HUD for players
-def draw_sidebar(screen, player, rolled):
+def draw_sidebar(screen, player, rolled,board):
     # Draw the sidebar background
     sidebar_rect = pygame.Rect(screen.get_width() - SIDEBAR_WIDTH, 0, SIDEBAR_WIDTH, screen.get_height())
     pygame.draw.rect(screen, GRAY, sidebar_rect)
@@ -479,6 +501,23 @@ def draw_sidebar(screen, player, rolled):
     points_text = font.render(f"Points: {player.points}", True, BLACK)
     screen.blit(name_text, (screen.get_width() - SIDEBAR_WIDTH + 10, 15))
     screen.blit(points_text, (screen.get_width() - SIDEBAR_WIDTH + 10, 60))
+
+    if len(player.rewards) >0:
+        if len(player.rewards)== 1:
+         
+            font_rew = pygame.font.Font(None, 25)
+            rewards_text = font_rew.render(player.rewards[0], True, RED)
+            screen.blit(rewards_text, (screen.get_width() - SIDEBAR_WIDTH + 10, 90))
+        else:
+            #only workds for one reward right now
+            font_rew1 = pygame.font.Font(None, 25)
+            rewards_text = font_rew1.render(player.rewards[0], True, RED)
+            font_rew2 = pygame.font.Font(None, 25)
+            rewards_text2 = font_rew2.render(player.rewards[1], True, RED)
+            screen.blit(rewards_text2, (screen.get_width() - SIDEBAR_WIDTH + 110, 90))
+
+
+            
 
     # Draw the resources section
     resources_text = font.render("Resources:", True, BLACK)
@@ -494,6 +533,10 @@ def draw_sidebar(screen, player, rolled):
     dev_text = font.render("Development Cards:", True, BLACK)
     screen.blit(dev_text, (screen.get_width() - SIDEBAR_WIDTH + 10, 620))
 
+    if player.points >=10:
+        board.gameover = True
+        board.winner= player
+        return
 
     if rolled:
         # Calculate the starting y-offset for buttons
@@ -535,7 +578,31 @@ def draw_sidebar(screen, player, rolled):
                 button_text = f"{text} ({card_count})"  # Combine text and card count
                 text_surface = font.render(button_text, True, WHITE)  # Render the text
                 screen.blit(text_surface, (x + 10, y + 2))  # Draw the text on the button
-        
+
+#for the final winner
+def draw_game_over_screen(player):
+    SCREEN.fill(WHITE)
+
+    # Draw "Game Over!" text
+    game_over_text = font_game_over.render("GAME OVER!", True, RED)
+    game_over_rect = game_over_text.get_rect(center=(WIDTH // 2, HEIGHT // 3))
+    SCREEN.blit(game_over_text, game_over_rect)
+
+    # Draw winner text
+    winner_text = font_winner.render(player.name + " WON!", True, BLUE)
+    winner_rect = winner_text.get_rect(center=(WIDTH // 2, HEIGHT // 2))
+    SCREEN.blit(winner_text, winner_rect)
+
+#when a player wins
+def draw_confetti():
+    for i in range(len(confetti)):
+        x, y, color = confetti[i]
+        pygame.draw.circle(SCREEN, color, (x, y), 5)  # Small confetti circles
+        confetti[i][1] += random.randint(2, 6)  # Falling speed
+        if confetti[i][1] > HEIGHT:  # Reset confetti at top
+            confetti[i][0] = random.randint(0, WIDTH)
+            confetti[i][1] = random.randint(-HEIGHT, 0)
+
 #main fucntion to control moves
 def make_turn(board, turn, players):
     rolled = False
@@ -603,10 +670,13 @@ def make_turn(board, turn, players):
                     
 
         # Draw the sidebar
-        draw_sidebar(SCREEN, players[turn], rolled)
+        if board.gameover == True:
+            return
+        draw_sidebar(SCREEN, players[turn], rolled,board)
         # Update the display
         pygame.display.flip()
 
+#helper function for monopoly
 def stealall(board,current_player,players):
     display_message("Click resource tile to steal!", 62)
     while True:
@@ -644,26 +714,86 @@ def stealall(board,current_player,players):
                             current_player.resources[rtype] = count
                             pygame.display.update()
                             return
-                        
+
+#using of mon dev card
 def useMonopoly(board,current_player,players):
     if 'Monopoly' in current_player.dev_cards and current_player.dev_cards["Monopoly"]>=1:
         stealall(board,current_player,players)
         current_player.dev_cards["Monopoly"]-=1
     return True
 
+# helper function for year of plenty 
+def take_two(board,current_player):
+    display_message("Click 2 resource tiles to steal!", 55)
+    types = []
+    while len(types)<2:
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                return
+
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                cords = event.pos  # Get the mouse click coordinates
+                mouse_x, mouse_y = cords
+
+                #go over each tile and check if the click is within the hexagon
+                for tile in board.tiles:
+                    x_center = tile.xcenter
+                    y_center = tile.ycenter
+
+                    #distance between the mouse click and the center of the tile
+                    distance = math.sqrt((mouse_x - x_center) ** 2 + (mouse_y - y_center) ** 2)
+
+                    #if the click is within the threshold 
+                    if distance <= HEX_SIZE:
+                        rtype = tile.resource
+                        types.append(rtype)
+    for r in types:
+        if r not in current_player.resources:
+            current_player.resources[r] = 1
+            pygame.display.update()
+        else:
+            current_player.resources[r] += 1
+            pygame.display.update()
+
+#using YOP dev
 def useYOP(board,current_player,players):
-    current_player.dev_cards["Year of Plenty"]-=1
+    if 'Year of Plenty' in current_player.dev_cards and current_player.dev_cards["Year of Plenty"]>=1:
+        take_two(board,current_player)
+        current_player.dev_cards["Year of Plenty"]-=1
+    #check which two resources wnated 
     return True
 
+#use of road builder dev
 def useroadbuilder(board,current_player,players):
-    current_player.dev_cards["Road Builder"]-=1
-    return True
+    if 'Road Builder' in current_player.dev_cards and current_player.dev_cards["Road Builder"]>=1:
+        freeroads(board,current_player)
+        current_player.dev_cards["Road Builder"]-=1
 
+#use of knight dev 
 def useknight(board,players,turn):
     if 'Knight' in players[turn].dev_cards and players[turn].dev_cards["Knight"]>=1:
         display_message("Move the Knight!", 62)
         rob(board,players,turn)
         players[turn].dev_cards["Knight"]-=1
+        players[turn].knightsplayed +=1 
+        #case of first person to make it to 3 knights 
+        if players[turn].knightsplayed >= board.knightsneeded:
+            if board.largestarmy==None:
+                board.largestarmy = players[turn]
+                players[turn].points+=2 
+                board.knightsneeded +=1 
+                players[turn].rewards.append("Largest Army")
+            elif players[turn].name == board.largestarmy.name:
+                board.knightsneeded +=1
+            else:
+                board.largestarmy.points-=2
+                board.largestarmy.rewards.remove("Largest Army")
+                board.largestarmy = players[turn]
+                players[turn].points+=2 
+                players[turn].rewards.append("Largest Army")
+                board.knightsneeded +=1 
+
         make_board(board)
 
     return True
@@ -934,8 +1064,46 @@ def buy_dev_card(board,player):
         make_board(board)
         pygame.display.update() 
 
+#function for road building dev card
+def freeroads(board,player):
+    display_message("Place 2 free roads!", 62)
+    verts = []
+    count =0
+    while count<2:
+        for event in pygame.event.get():
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                cords = event.pos
+                # Find the vertex closest to the mouse click
+                for id, vertex in board.vertices.items():
+                    # add the checker
+                    if is_close_enough(cords, vertex.cords, threshold=8):
+                        if len(verts) == 0:  # First click, record the vertex
+                            if reachable(board, player, vertex):
+                                verts.append(vertex.id)
+                                print('First vertex reachable:', vertex)
+                                break  #Exit the loop after selecting the first vertex
+                            else:
+                                print("Vertex not reachable.")
+                                return  # Return early if the first vertex is not reachable
+                            
+                        else:  #Second click, check if it's valid
+                            if vertex.id in ADJ_MATRIX[verts[0]]:  #Check adjacency
+                                verts.append(vertex.id)
+                                edge = Edge(board.vertices[verts[0]], board.vertices[verts[1]], player.name,player.color)
+                                board.edges.append(edge)
+                                count +=1 
+                                break  
+                            else:
+                                print("Second vertex is not adjacent.")
+                                verts.clear()  
+                                break  
+        make_board(board)
+        pygame.display.update()  
+
+    return
+
 #main function 
-def main():
+def main(): 
     turn = random.randint(0,3)
     setup_phase = True
     main_phase = False
@@ -965,42 +1133,55 @@ def main():
     turns = [0, 1, 2, 3, 3, 2, 1, 0]
     running = True 
 
-    while running:
-        make_board(board)
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                running = False
-            elif setup_phase:
-                setup_phase = initialsetup(players, board, turns)
-                main_phase = True
-            elif main_phase:
-                make_turn(board, turn, players)
-                turn = (turn + 1) % len(players)
-
-    #for testing
-    # PLAYER1.resources = {'wheat':121, 'brick':23, "ore":1234,"sheep":1234,'wood':23}
-    # PLAYER2.resources = {'wheat':4, 'brick':23, "ore":12,"sheep":12,'wood':23}
-    # PLAYER3.resources = {'wheat':151, 'brick':23, "ore":12,"sheep":12,'wood':23}
-    # PLAYER4.resources = {'wheat':11, 'brick':23, "ore":12,"sheep":12,'wood':23}
     # while running:
     #     make_board(board)
-    #     if not main_phase:
-    #         make_turn(board,turn,players)
+    #     for event in pygame.event.get():
+    #         if event.type == pygame.QUIT:
+    #             running = False
+    #         elif setup_phase:
+    #             setup_phase = initialsetup(players, board, turns)
+    #             main_phase = True
+    #         elif main_phase:
+    #             make_turn(board, turn, players)
+    #             turn = (turn + 1) % len(players)
+
+    # for testing
+    PLAYER3.resources = {'wheat':1234, 'brick':0, "ore":1234,"sheep":1234,'wood':0}
+    PLAYER2.resources = {'wheat':1234, 'brick':0, "ore":1234,"sheep":1234,'wood':0}
+    PLAYER3.points = 0
+    while board.gameover==False:
+        make_board(board)
+        if not main_phase:
+            make_turn(board,turn,players)
+    
+    print("game over")
+    while True:
+        SCREEN.fill(WHITE)
+        draw_game_over_screen(board.winner)
+        draw_confetti()
+
+        pygame.display.flip()  # Refresh the screen
+
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                exit()  
 
 
 if __name__ == "__main__":
     main()
 
 
-# building roads ontop of eachother, 
-# when game gets to 10, 
-# give players startiong cards,
-# check for largest army and longest road 
+# building roads ontop of eachother 
+# check for longest road 
 # limit number of houses and cities and roads 
-# trading  
-# show how many knights were used
-# finish year of plenty and longest road
 
 
-# a couple notes: when a 7 is rolled, you do not get to choose which cards you remove, it is random... 
-# dev cards can only be used once a turn, dev cards must wait a turn to use
+
+
+# A couple notes: when a 7 is rolled, you do not get to choose which cards you remove, it is random...
+# Secondly, there is an issue where if you make an error using road builder dev card, will still deduct from your dev cards 
+# trading is not available atm 
+# there is no limit on resources, or a limit to roads/houses/cities
+# currently can build roads between another house.
+# can use unlimited dev cards, and limit one per term

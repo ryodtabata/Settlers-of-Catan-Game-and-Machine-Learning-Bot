@@ -48,8 +48,11 @@ class Board():
         self.edges = []
         self.turn = random.randint(1,4)
         self.vertices = vertices
-        self.longestroad = None
+        self.gameover = False
+        self.winner = None
         self.largestarmy = None
+        self.longestroad = None
+        self.knightsneeded = 3 
              
 class Player():
     def __init__(self,name,color):
