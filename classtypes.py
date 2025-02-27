@@ -51,8 +51,10 @@ class Board():
         self.gameover = False
         self.winner = None
         self.largestarmy = None
-        self.longestroad = None
+        self.longestroad = 3
         self.knightsneeded = 3 
+        self.haslongestroad = None
+       
              
 class Player():
     def __init__(self,name,color):
@@ -63,6 +65,7 @@ class Player():
         self.name = name
         self.color = color
         self.knightsplayed = 0
+        self.playeddev = False
     
     def build_settlement(self,board,vertex):
         board.vertices[vertex].owner = self.name

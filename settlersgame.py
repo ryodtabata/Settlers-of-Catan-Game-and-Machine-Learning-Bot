@@ -381,10 +381,11 @@ def initialsetup(players, board, turns):
                             if current_player.points ==2:
                                 for tile in board.tiles:
                                     if vertexid in tile.verts:
-                                        if tile.resource in current_player.resources:
-                                            current_player.resources[tile.resource]+=1
-                                        else:
-                                            current_player.resources[tile.resource] =1 
+                                        if tile.resource!= "Desert":
+                                            if tile.resource in current_player.resources:
+                                                current_player.resources[tile.resource]+=1
+                                            else:
+                                                current_player.resources[tile.resource] =1 
                                             
                             make_board(board)
                             first_road(board,current_player,vertexid)
@@ -502,22 +503,22 @@ def draw_sidebar(screen, player, rolled,board):
     screen.blit(name_text, (screen.get_width() - SIDEBAR_WIDTH + 10, 15))
     screen.blit(points_text, (screen.get_width() - SIDEBAR_WIDTH + 10, 60))
 
-    if len(player.rewards) >0:
+    if len(player.rewards) > 0:
         if len(player.rewards)== 1:
-         
+            
             font_rew = pygame.font.Font(None, 25)
             rewards_text = font_rew.render(player.rewards[0], True, RED)
             screen.blit(rewards_text, (screen.get_width() - SIDEBAR_WIDTH + 10, 90))
         else:
-            #only workds for one reward right now
-            font_rew1 = pygame.font.Font(None, 25)
-            rewards_text = font_rew1.render(player.rewards[0], True, RED)
-            font_rew2 = pygame.font.Font(None, 25)
-            rewards_text2 = font_rew2.render(player.rewards[1], True, RED)
-            screen.blit(rewards_text2, (screen.get_width() - SIDEBAR_WIDTH + 110, 90))
+            font_rew = pygame.font.Font(None, 25)
+            rewards_text = font_rew.render(player.rewards[0], True, RED)
+            screen.blit(rewards_text, (screen.get_width() - SIDEBAR_WIDTH + 10, 90))
+            #for longest road
+            font_road = pygame.font.Font(None, 25)
+            rewards_text = font_road.render(player.rewards[1], True, BLUE)
+            screen.blit(rewards_text, (screen.get_width() - SIDEBAR_WIDTH + 125, 90))
+          
 
-
-            
 
     # Draw the resources section
     resources_text = font.render("Resources:", True, BLACK)
@@ -605,7 +606,14 @@ def draw_confetti():
 
 #main fucntion to control moves
 def make_turn(board, turn, players):
+
+    players[turn].playeddev = False
     rolled = False
+    for p in players:
+        if "Longest Road" in p.rewards and board.haslongestroad!=p.name:
+            p.rewards.remove("Longest Road")
+            p.points-=2
+
     while True:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
@@ -666,9 +674,6 @@ def make_turn(board, turn, players):
                         elif button_y_start + 400 <= mouse_pos[1] <= button_y_start + 410 + DEV_BUTTON_HEIGHT:
                             useroadbuilder(board,players[turn],players)
                             print("Road Builder")
-
-                    
-
         # Draw the sidebar
         if board.gameover == True:
             return
@@ -678,6 +683,8 @@ def make_turn(board, turn, players):
 
 #helper function for monopoly
 def stealall(board,current_player,players):
+    if current_player.playeddev == True:
+        return
     display_message("Click resource tile to steal!", 62)
     while True:
         for event in pygame.event.get():
@@ -709,21 +716,27 @@ def stealall(board,current_player,players):
                         if rtype in current_player.resources:
                             current_player.resources[rtype] += count
                             pygame.display.update()
+                            player.playeddev=True
                             return
                         else: 
                             current_player.resources[rtype] = count
                             pygame.display.update()
+                            player.playeddev=True
                             return
 
 #using of mon dev card
 def useMonopoly(board,current_player,players):
+    if current_player.playeddev == True:
+        return
     if 'Monopoly' in current_player.dev_cards and current_player.dev_cards["Monopoly"]>=1:
         stealall(board,current_player,players)
         current_player.dev_cards["Monopoly"]-=1
+        current_player.playeddev = True
     return True
 
 # helper function for year of plenty 
 def take_two(board,current_player):
+
     display_message("Click 2 resource tiles to steal!", 55)
     types = []
     while len(types)<2:
@@ -758,21 +771,33 @@ def take_two(board,current_player):
 
 #using YOP dev
 def useYOP(board,current_player,players):
+    if current_player.playeddev == True:
+        return
     if 'Year of Plenty' in current_player.dev_cards and current_player.dev_cards["Year of Plenty"]>=1:
         take_two(board,current_player)
         current_player.dev_cards["Year of Plenty"]-=1
+        current_player.playeddev = True
     #check which two resources wnated 
     return True
 
 #use of road builder dev
 def useroadbuilder(board,current_player,players):
+    if current_player.playeddev == True:
+        return
     if 'Road Builder' in current_player.dev_cards and current_player.dev_cards["Road Builder"]>=1:
         freeroads(board,current_player)
         current_player.dev_cards["Road Builder"]-=1
+        current_player.playeddev = True
 
 #use of knight dev 
 def useknight(board,players,turn):
-    if 'Knight' in players[turn].dev_cards and players[turn].dev_cards["Knight"]>=1:
+
+    if players[turn].playeddev == True:
+        print("true")
+        return
+    
+    elif 'Knight' in players[turn].dev_cards and players[turn].dev_cards["Knight"]>=1:
+        players[turn].playeddev = True
         display_message("Move the Knight!", 62)
         rob(board,players,turn)
         players[turn].dev_cards["Knight"]-=1
@@ -793,7 +818,6 @@ def useknight(board,players,turn):
                 players[turn].points+=2 
                 players[turn].rewards.append("Largest Army")
                 board.knightsneeded +=1 
-
         make_board(board)
 
     return True
@@ -864,22 +888,39 @@ def build_road(board,player):
                     # add the checker
                     if is_close_enough(cords, vertex.cords, threshold=8):
                         if len(verts) == 0:  # First click, record the vertex
-                            if reachable(board, player, vertex):
-                                verts.append(vertex.id)
-                                print('First vertex reachable:', vertex)
-                                break  #Exit the loop after selecting the first vertex
-                            else:
-                                print("Vertex not reachable.")
-                                return  # Return early if the first vertex is not reachable
+                            if vertex.owner == None or vertex.owner==player.name:
+                                if reachable(board, player, vertex):
+                                    verts.append(vertex.id)
+                                    print('First vertex reachable:', vertex)
+                                    break  #Exit the loop after selecting the first vertex
+                                else:
+                                    print("Vertex not reachable.")
+                                    return  # Return early if the first vertex is not reachable
+                            return
                             
                         else:  #Second click, check if it's valid
                             if vertex.id in ADJ_MATRIX[verts[0]]:  #Check adjacency
                                 verts.append(vertex.id)
+                                #catches roads already built
+                                for edge in board.edges:
+                                    # print(edge.vertex1.id,edge.vertex2)
+                                    # print(verts[0],verts[1])
+                                    if (edge.vertex1.id==verts[0] and edge.vertex2.id==verts[1]) or (edge.vertex1.id==verts[1] and edge.vertex2.id==verts[0]):
+                                        print("vert already in")
+                                        return
+                                
                                 edge = Edge(board.vertices[verts[0]], board.vertices[verts[1]], player.name,player.color)
                                 board.edges.append(edge)
                                 for r in rrs:
                                     player.resources[r]-=1
                                 print(f"Road built between {verts[0]} and {verts[1]}")
+                                longest = get_longest_road(board,player)
+                                if longest>board.longestroad:
+                                    board.haslongestroad = player.name
+                                    board.longestroard = longest
+                                    if "Longest Road" not in player.rewards:
+                                        player.rewards.append("Longest Road")
+                                        player.points+=2
                                 running = False  
                                 break  
                             else:
@@ -888,6 +929,7 @@ def build_road(board,player):
                                 break  
         make_board(board)
         pygame.display.update()  
+        
 
     return
 
@@ -1051,6 +1093,7 @@ def buy_dev_card(board,player):
    
     else:
         #player can afford
+        player.playeddev= True
         card = DEV_CARDS.pop()
         if card not in player.dev_cards:
             player.dev_cards[card] = 1
@@ -1061,6 +1104,7 @@ def buy_dev_card(board,player):
         for r in rrs:
             player.resources[r]-=1
 
+        
         make_board(board)
         pygame.display.update() 
 
@@ -1102,6 +1146,37 @@ def freeroads(board,player):
 
     return
 
+
+#function to find longeset road
+def get_longest_road(board, player):
+    # Step 1: Filter only roads owned by the player
+    player_roads = {(edge.vertex1.id, edge.vertex2.id) for edge in board.edges if edge.owner == player.name}
+
+    # Step 2: Build an adjacency list for the player's roads
+    road_graph = {v: set() for v1, v2 in player_roads for v in (v1, v2)}
+    for v1, v2 in player_roads:
+        road_graph[v1].add(v2)
+        road_graph[v2].add(v1)
+
+    # Step 3: DFS function to find the longest path
+    def dfs(vertex, visited_edges):
+        max_length = 0
+        for neighbor in road_graph[vertex]:
+            edge = tuple(sorted((vertex, neighbor)))
+            if edge not in visited_edges:
+                visited_edges.add(edge)
+                max_length = max(max_length, 1 + dfs(neighbor, visited_edges))
+                visited_edges.remove(edge)
+        return max_length
+
+    # Step 4: Run DFS from all road endpoints
+    longest_road = 0
+    for v1, v2 in player_roads:
+        longest_road = max(longest_road, dfs(v1, {tuple(sorted((v1, v2)))}))
+        longest_road = max(longest_road, dfs(v2, {tuple(sorted((v1, v2)))}))
+    return longest_road  # Ensure function returns a value
+
+
 #main function 
 def main(): 
     turn = random.randint(0,3)
@@ -1131,28 +1206,19 @@ def main():
 
     #Turns for staring, making the settlements etc 
     turns = [0, 1, 2, 3, 3, 2, 1, 0]
-    running = True 
-
-    # while running:
-    #     make_board(board)
-    #     for event in pygame.event.get():
-    #         if event.type == pygame.QUIT:
-    #             running = False
-    #         elif setup_phase:
-    #             setup_phase = initialsetup(players, board, turns)
-    #             main_phase = True
-    #         elif main_phase:
-    #             make_turn(board, turn, players)
-    #             turn = (turn + 1) % len(players)
-
-    # for testing
-    PLAYER3.resources = {'wheat':1234, 'brick':0, "ore":1234,"sheep":1234,'wood':0}
-    PLAYER2.resources = {'wheat':1234, 'brick':0, "ore":1234,"sheep":1234,'wood':0}
-    PLAYER3.points = 0
+    # running = True 
+    
     while board.gameover==False:
         make_board(board)
-        if not main_phase:
-            make_turn(board,turn,players)
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                board.gameover = True
+            elif setup_phase:
+                setup_phase = initialsetup(players, board, turns)
+                main_phase = True
+            elif main_phase:
+                make_turn(board, turn, players)
+                turn = (turn + 1) % len(players)
     
     print("game over")
     while True:
@@ -1168,20 +1234,16 @@ def main():
                 exit()  
 
 
+
 if __name__ == "__main__":
     main()
 
-
-# building roads ontop of eachother 
-# check for longest road 
-# limit number of houses and cities and roads 
-
-
+#need to add ports
 
 
 # A couple notes: when a 7 is rolled, you do not get to choose which cards you remove, it is random...
-# Secondly, there is an issue where if you make an error using road builder dev card, will still deduct from your dev cards 
-# trading is not available atm 
-# there is no limit on resources, or a limit to roads/houses/cities
-# currently can build roads between another house.
-# can use unlimited dev cards, and limit one per term
+# 2. there is an issue where if you make an error while using the road builder, it will cancel it.
+# 3. trading is not available atm 
+# 4. there is no limit on resources, or a limit to roads/houses/cities
+# 5. dev cards, must be played before buying new ones, otherwise will not work
+# 6. need ports still 
